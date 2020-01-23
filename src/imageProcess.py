@@ -166,8 +166,7 @@ def getnonpearls(outpng,fname):
 
 
 def main():
-    global refPt
-    global i
+    global refPt,i,ddir
     nangles = 16
     angles = np.linspace(-np.pi,np.pi,nangles,endpoint=False)
 
@@ -195,10 +194,9 @@ def main():
         IMG = np.fft.fft2(img.astype(float))
         OUT1 = IMG * cos2(img,0,.2)
         OUT2 = IMG * -1.*sin2(img,0,.2)
-        out1 = np.fft.ifft2( OUT1 ).real
+        out1 = uint8norm(np.fft.ifft2( OUT1 ).real)
         out2 = np.fft.ifft2( OUT2 ).real
-        out2p = uint8normSign(out2,1)
-        out2n = uint8normSign(out2,-1)
+        out2 = uint8norm(out2)
 
 
         outpng = np.zeros((img.shape[0], img.shape[1], 7),dtype=int)
@@ -222,8 +220,8 @@ def main():
 
 
         outpng[:,:,0] = uint8norm(scalarmat).astype(np.uint8)
-        outpng[:,:,1] = out2p.astype(np.uint8)
-        outpng[:,:,2] = out2n.astype(np.uint8)
+        outpng[:,:,1] = out2.astype(np.uint8)
+        outpng[:,:,2] = out1.astype(np.uint8)
         outpng[:,:,3] = uint8normSign(stdmat,1).astype(np.uint8)
         '''
         outpng[:,:,4] = directionmat.astype(np.uint8) # this one I don't norm since I don't want the direction variation from 0..2pi to dominate the image... 
@@ -238,13 +236,13 @@ def main():
         cv.namedWindow("Pearls")
         pearlcoords = getpearls(outpng,fname)
         refPt = []
-        fname = '%snewoutput/frame_%03i.nonpearls'%(ddir,i)
+        fname = '%s/newoutput/frame_%03i.nonpearls'%(ddir,i)
         cv.namedWindow("Non-pearls")
         nonpearlcoords = getnonpearls(outpng,fname)
 
 
 
-        logic = uint8normSign( np.abs(outpng[:,:,0] + 1j*(outpng[:,:,1] - outpng[:,:,2])) , 1)
+        logic = uint8norm( np.abs(outpng[:,:,0] + 1j*2*(outpng[:,:,1]-127)) )
         logic += np.sum(outpng[:,:,:6].astype(float),axis=2)
         meanmat = np.fft.ifft2(gauss(img,0,.0015)*np.fft.fft2(logic)).real 
         logic -= meanmat
@@ -268,7 +266,7 @@ def main():
             truth[inds] = 0 
 
         cv.imwrite('%s/newoutput/truth_%03i.png'%(ddir,i),truth)
-        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), outpng[:,:,3:])
+        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), outpng[:,:,3:-1])
 
         cv.namedWindow("Truth")
         cv.imshow("Truth",truth.astype(np.uint8))
