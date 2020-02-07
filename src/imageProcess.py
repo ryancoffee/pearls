@@ -183,7 +183,7 @@ def main():
 
     for i in range(0,92,1):
         filename = "%s/frames_%i.mat"%(ddir,i)
-        outname = "%s/out_%i.dat"%(ddir,i)
+        outname = "%s/out0_%i.dat"%(ddir,i)
         img = loadfile(filename)
         img = uintBDnorm(cv.medianBlur(img,3),12)
         #img = uintBDnorm(cv.erode(img,np.ones((3,3),dtype=np.uint8),iterations=1),12)
@@ -199,7 +199,7 @@ def main():
         out2 = uint8norm(out2)
 
 
-        outpng = np.zeros((img.shape[0], img.shape[1], 7),dtype=int)
+        outpng = np.zeros((img.shape[0], img.shape[1], 9),dtype=int)
         ## stddev blur
         meanmat = np.zeros(img.shape,dtype=float)
         stdmat = np.zeros(img.shape,dtype=float)
@@ -242,6 +242,7 @@ def main():
 
 
 
+        '''
         logic = uint8norm( np.abs(outpng[:,:,0] + 1j*2*(outpng[:,:,1]-127)) )
         logic += np.sum(outpng[:,:,:6].astype(float),axis=2)
         meanmat = np.fft.ifft2(gauss(img,0,.0015)*np.fft.fft2(logic)).real 
@@ -253,23 +254,33 @@ def main():
         cv.imwrite('%s/newoutput/logic_img%03i.png'%(ddir,i), logic) 
         outpng[:,:,3] = uint8normSign(logic.astype(float),1).astype(np.uint8)
         outpng[:,:,6] = np.ones((img.shape),dtype=np.uint8)*128
+        outpng[:,:,7] = np.ones((img.shape),dtype=np.uint8)*128
+        outpng[:,:,8] = np.ones((img.shape),dtype=np.uint8)*128
+        '''
         truth = outpng[:,:,6]
+        radii = outpng[:,:,7]
+        directions = outpng[:,:,8]
 
 
 
+        radii_lim = 20.
         for (x,y) in pearlcoords:
-            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < 10**2)
+            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
+            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 254).astype(int)
+            directions[inds] = (np.angle((XXindmap[inds]-x) + 1j*(YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
             truth[inds] = 255
 
         for (x,y) in nonpearlcoords:
-            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < 10**2)
+            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
+            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 254).astype(int)
+            directions[inds] = (np.angle((XXindmap[inds]-x) + 1j * (YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
             truth[inds] = 0 
 
-        cv.imwrite('%s/newoutput/truth_%03i.png'%(ddir,i),truth)
-        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), outpng[:,:,3:-1])
+        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), outpng[:,:,3:6])
+        cv.imwrite('%s/newoutput/out3_img%03i.png'%(ddir,i), outpng[:,:,6:9])
 
         cv.namedWindow("Truth")
-        cv.imshow("Truth",truth.astype(np.uint8))
+        cv.imshow("Truth",outpng[:,:,6:9].astype(np.uint8))
         cv.waitKey(0)
         cv.destroyAllWindows()
 
