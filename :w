@@ -189,8 +189,6 @@ def main():
         imgcopy = np.copy(img)
         cv.imwrite('%s/newoutput/orig_img%03i.png'%(ddir,i), uint8norm(imgcopy).astype(np.uint8)) 
 
-        del imgcopy
-
         ## cos2 and sin2 blurs
         IMG = np.fft.fft2(img.astype(float))
         OUT1 = IMG * cos2(img,0,.2)
@@ -218,11 +216,17 @@ def main():
 
         del outmat
 
-        outpng[:,:,0] = out2.astype(np.uint8)
+
+
         outpng[:,:,1] = uint8norm(scalarmat).astype(np.uint8)
+        outpng[:,:,0] = out2.astype(np.uint8)
         outpng[:,:,2] = out1.astype(np.uint8)
-        outpng[:,:,4] = uint8normSign(stdmat,1).astype(np.uint8)
-        outpng[:,:,3] = (np.cos(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
+        outpng[:,:,3] = uint8normSign(stdmat,1).astype(np.uint8)
+        '''
+        outpng[:,:,4] = directionmat.astype(np.uint8) # this one I don't norm since I don't want the direction variation from 0..2pi to dominate the image... 
+        outpng[:,:,5] = uint8normSign(out1,1).astype(np.uint8)
+        '''
+        outpng[:,:,4] = (np.cos(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
         outpng[:,:,5] = (np.sin(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
         cv.imwrite('%s/newoutput/out1_img%03i.png'%(ddir,i), outpng[:,:,:3]) 
 
@@ -242,6 +246,8 @@ def main():
         radii = outpng[:,:,7]
         directions = outpng[:,:,8]
 
+
+
         radii_lim = 20.
         for (x,y) in pearlcoords:
             inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
@@ -259,11 +265,7 @@ def main():
         cv.imwrite('%s/newoutput/out3_img%03i.png'%(ddir,i), outpng[:,:,6:9])
 
         cv.namedWindow("Truth")
-        tempout = np.zeros((outpng.shape[0],outpng.shape[1],4),dtype=np.uint8)
-        tempout[:,:,0:3] = outpng[:,:,0:3]
-        tempout[:,:,3] = outpng[:,:,6]
-        tempout[:,:,2] = outpng[:,:,6]
-        cv.imshow("Truth",tempout.astype(np.uint8))
+        cv.imshow("Truth",outpng[:,:,6:9].astype(np.uint8))
         cv.waitKey(0)
         cv.destroyAllWindows()
 
