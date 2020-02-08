@@ -260,9 +260,10 @@ def main():
 
         cv.namedWindow("Truth")
         tempout = np.zeros((outpng.shape[0],outpng.shape[1],4),dtype=np.uint8)
-        tempout[:,:,0:3] = outpng[:,:,0:3]
-        tempout[:,:,3] = outpng[:,:,6]
-        tempout[:,:,2] = outpng[:,:,6]
+        tempout[:,:,0] = outpng[:,:,0]
+        tempout[:,:,1] = outpng[:,:,1]
+        tempout[:,:,2] = outpng[:,:,2]
+        tempout[:,:,3] = ((truth.astype(float)-127) /4.+127).astype(np.uint8)
         cv.imshow("Truth",tempout.astype(np.uint8))
         cv.waitKey(0)
         cv.destroyAllWindows()
