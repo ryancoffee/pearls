@@ -241,17 +241,18 @@ def main():
         truth = outpng[:,:,6]
         radii = outpng[:,:,7]
         directions = outpng[:,:,8]
+        truth += 127
 
         radii_lim = 20.
         for (x,y) in pearlcoords:
             inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
-            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 254).astype(int)
+            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
             directions[inds] = (np.angle((XXindmap[inds]-x) + 1j*(YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
             truth[inds] = 255
 
         for (x,y) in nonpearlcoords:
             inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
-            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 254).astype(int)
+            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
             directions[inds] = (np.angle((XXindmap[inds]-x) + 1j * (YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
             truth[inds] = 0 
 
@@ -263,14 +264,14 @@ def main():
         tempout[:,:,0] = outpng[:,:,0]
         tempout[:,:,1] = outpng[:,:,1]
         tempout[:,:,2] = outpng[:,:,2]
-        tempout[:,:,3] = ((truth.astype(float)-127) /4.+127).astype(np.uint8)
+        tempout[:,:,3] = truth
         cv.imshow("Truth",tempout.astype(np.uint8))
         cv.waitKey(0)
         cv.destroyAllWindows()
 
         outpng = outpng.reshape((outpng.shape[0]*outpng.shape[1],outpng.shape[2]))
-        pearlrows = [row[:-1] for row in outpng.tolist() if row[6] > 128]
-        nonpearlrows = [row[:-1] for row in outpng.tolist() if row[6] < 128]
+        pearlrows = [row for row in outpng.tolist() if row[6] > 200]
+        nonpearlrows = [row for row in outpng.tolist() if row[6] < 100]
         np.savetxt('%s/newoutput/allpixels_img%03i.dat'%(ddir,i),outpng,fmt='%i')
         np.savetxt('%s/newoutput/pearls_img%03i.dat'%(ddir,i),np.array(pearlrows),fmt='%i')
         np.savetxt('%s/newoutput/nonpearls_img%03i.dat'%(ddir,i),np.array(nonpearlrows),fmt='%i')
