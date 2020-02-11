@@ -163,13 +163,16 @@ set loadpath
 set fontpath 
 set psdir
 set fit brief errorvariables nocovariancevariables errorscaling prescale nowrap v5
-GNUTERM = "qt"
-## Last datafile plotted: "pearls_img000.dat"
-unset view
-set term png size 1600,1000
-set output 'plotting.pearls.groundtruth.png'
 pearlsfile(x) = sprintf('./DataSet2/newoutput/pearls_img%03i.dat',x)
 nonpearlsfile(x) = sprintf('./DataSet2/newoutput/nonpearls_img%03i.dat',x)
+outname(x) = sprintf('./DataSet2/newoutput/comparison_img%03i.png',x)
+GNUTERM = "qt"
+## Last datafile plotted: "pearls_img000.dat"
+do for [img=0:8]{
+print(sprintf('Image #i',img))
+unset view
+set term png size 1600,1000
+set output outname(img)
 set view 60,40
 set xrange [0:256]
 set yrange [0:350]
@@ -184,17 +187,18 @@ set cblabel 'mag. gradient'
 set size .5,.6
 set title 'pearl' offset 0,-4
 set pointsize 0.25
-splot pearlsfile(0) u (256-$9):(350):1 lc rgb 'grey' pt 7 notitle, pearlsfile(0) u (0):8:1 lc rgb 'grey' pt 7 notitle, pearlsfile(0) u (256-$9):8:1:2 palette notitle
+splot pearlsfile(img) u (256-$9):(350):1 lc rgb 'grey' pt 7 notitle, pearlsfile(img) u (0):8:1 lc rgb 'grey' pt 7 notitle, pearlsfile(img) u (256-$9):8:1:2 palette notitle
 set origin .5,.5
 set title 'non-pearl'
-splot nonpearlsfile(0) u (256-$9):(350):1 lc rgb 'grey' pt 7 notitle,nonpearlsfile(0) u (0):8:1 lc rgb 'grey' pt 7 notitle, nonpearlsfile(0) u (256-$9):8:1:2 palette pt 7 notitle
+splot nonpearlsfile(img) u (256-$9):(350):1 lc rgb 'grey' pt 7 notitle,nonpearlsfile(img) u (0):8:1 lc rgb 'grey' pt 7 notitle, nonpearlsfile(img) u (256-$9):8:1:2 palette pt 7 notitle
 set origin 0,0
 set title 'pearl'
 set zlabel "filtered"
 set cblabel 'std. dev'
-splot pearlsfile(0) u (256-$9):(350):3 lc rgb 'grey' pt 7 notitle,pearlsfile(0) u (0):8:3 lc rgb 'grey' pt 7 notitle, pearlsfile(0) u (256-$9):8:3:5 palette pt 7 notitle
+splot pearlsfile(img) u (256-$9):(350):3 lc rgb 'grey' pt 7 notitle,pearlsfile(img) u (0):8:3 lc rgb 'grey' pt 7 notitle, pearlsfile(img) u (256-$9):8:3:5 palette pt 7 notitle
 set title 'non-pearl'
 set origin .5,0
-splot nonpearlsfile(0) u (256-$9):(350):3 lc rgb 'grey' pt 7 notitle,nonpearlsfile(0) u (0):8:3 lc rgb 'grey' pt 7 notitle,nonpearlsfile(0) u (256-$9):8:3:5 palette pt 7 notitle
+splot nonpearlsfile(img) u (256-$9):(350):3 lc rgb 'grey' pt 7 notitle,nonpearlsfile(img) u (0):8:3 lc rgb 'grey' pt 7 notitle,nonpearlsfile(img) u (256-$9):8:3:5 palette pt 7 notitle
 unset multiplot
+}
 #    EOF

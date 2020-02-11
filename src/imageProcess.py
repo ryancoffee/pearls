@@ -164,10 +164,11 @@ def getnonpearls(outpng,fname):
     np.savetxt(fname,np.asarray(refPt),fmt='%i')
     return refPt
 
+bandwidth = 0.4
+nangles = 16
 
 def main():
-    global refPt,i,ddir
-    nangles = 16
+    global refPt,i,ddir,bandwidth,nangles
     angles = np.linspace(-np.pi,np.pi,nangles,endpoint=False)
 
     filename = "%s/frames_1.mat"%(ddir)
@@ -181,6 +182,12 @@ def main():
         grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.0125)
         GRAD[:,:,t] = np.fft.fft2(grad[:,:,t])
 
+    #tempout = uint8norm(grad[:,:,0]).astype(np.uint8)
+    COS2 = cos2(img,0,bandwidth)
+    SIN2 = -1*sin2(img,0,bandwidth)
+
+    
+
     for i in range(0,92,1):
         filename = "%s/frames_%i.mat"%(ddir,i)
         outname = "%s/out0_%i.dat"%(ddir,i)
@@ -193,8 +200,8 @@ def main():
 
         ## cos2 and sin2 blurs
         IMG = np.fft.fft2(img.astype(float))
-        OUT1 = IMG * cos2(img,0,.2)
-        OUT2 = IMG * -1.*sin2(img,0,.2)
+        OUT1 = IMG * COS2
+        OUT2 = IMG * SIN2
         out1 = uint8norm(np.fft.ifft2( OUT1 ).real)
         out2 = np.fft.ifft2( OUT2 ).real
         out2 = uint8norm(out2)
@@ -282,4 +289,6 @@ def main():
 
 if __name__ == "__main__":
     ddir = "./DataSet2"
+    bandwidth =0.4
+    nangles = 16
     main()
