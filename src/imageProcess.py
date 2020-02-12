@@ -1,6 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
+import skimage.measure
 import cv2 as cv
 
 def gauss(M,center=0.,bwd=1.):
@@ -15,8 +16,10 @@ def cos2(M,center=0.,bwd=1.):
     x=np.fft.fftfreq(M.shape[0])
     y=np.fft.fftfreq(M.shape[1])
     XX,YY = np.meshgrid(x,y)
+    ZZ = np.zeros(XX.shape)
     RR = np.sqrt(np.power(XX,int(2)) + np.power(YY,int(2)))
-    ZZ = 1+np.cos(RR/bwd*np.pi) * (RR<bwd)
+    inds = np.where(RR<bwd)
+    ZZ[inds] = 0.5*(1+np.cos(RR[inds]/bwd*np.pi))
     return ZZ.T
 
 def sin2(M,center=0.,bwd=1.):
@@ -24,7 +27,9 @@ def sin2(M,center=0.,bwd=1.):
     y=np.fft.fftfreq(M.shape[1])
     XX,YY = np.meshgrid(x,y)
     RR = np.sqrt(np.power(XX,int(2)) + np.power(YY,int(2)))
-    ZZ = np.power(np.sin(RR/bwd*np.pi),int(2)) * (RR/bwd<1.)
+    ZZ = np.zeros(XX.shape)
+    inds = np.where(RR<bwd)
+    ZZ[inds] = np.power(np.sin(RR[inds]/bwd*np.pi),int(2))
     return ZZ.T
 
 def derivH(M,center=0.,bwd=.1):
@@ -69,55 +74,55 @@ def corkscrewTH(M,th=0.,center=0.,bwd=.1):
     ZZP = np.roll(ZZP,ZZP.shape[1]//2,axis=1)
     return ZZP
 
-def uintBDnorm(x,bd=8):
+def uintBDnorm(x,bd=8,border=2):
     result = np.zeros(x.shape)
     if len(x.shape)>2:
         for i in range(x.shape[2]):
             r = np.copy(x[:,:,i])
-            mn = np.min(r)
+            mn = np.min(r[border:-border,border:-border])
             r -= mn
-            mx = np.max(r)
-            r *= (np.power(int(2),int(bd))-1)/mx
+            mx = np.max(r[border:-border,border:-border])
+            r *= int(np.power(2,int(bd))-1)//mx
             result[:,:,i] = np.clip(r,0,np.power(int(2),int(bd))-1)
     else:
-        r = np.copy(x[:,:])
-        mn = np.min(r)
+        r = np.copy(x)
+        mn = np.min(r[border:-border,border:-border])
         r -= mn
-        mx = np.max(r)
-        r *= (np.power(int(2),int(bd))-1)/mx
+        mx = np.max(r[border:-border,border:-border])
+        r *= int(np.power(2,bd)-1)//mx
         result[:,:] = np.clip(r,0,np.power(int(2),int(bd))-1)
     return result
 
-def uint8norm(x):
+def uint8norm(x,border=2):
     result = np.zeros(x.shape)
     if len(x.shape)>2:
         for i in range(x.shape[2]):
             r = np.copy(x[:,:,i]).astype(float)
-            mn = np.min(r)
+            mn = np.min(r[border:-border,border:-border])
             r -= mn
-            mx = np.max(r)
+            mx = np.max(r[border:-border,border:-border])
             r *= 255./mx
             result[:,:,i] = np.clip(r,0,255)
     else:
-        r = np.copy(x[:,:])
-        mn = np.min(r)
+        r = np.copy(x)
+        mn = np.min(r[border:-border,border:-border])
         r -= mn
-        mx = np.max(r)
+        mx = np.max(r[border:-border,border:-border])
         r *= 255./mx
         result[:,:] = np.clip(r,0,255)
     return result
 
-def uint8normSign(x,s=1):
+def uint8normSign(x,s=1,border=2):
     result = np.zeros(x.shape)
     if len(x.shape)>2:
         for i in range(x.shape[2]):
             r = np.copy(s*x[:,:,i]).astype(float)
-            mx = np.max(r)
+            mx = np.max(r[border:-border,border:-border])
             r *= 255./mx
             result[:,:,i] = np.clip(r,0,255)
     else:
-        r = np.copy(s*x[:,:])
-        mx = np.max(r)
+        r = np.copy(s*x)
+        mx = np.max(r[border:-border,border:-border])
         r *= 255./mx
         result[:,:] = np.clip(r,0,255)
     return result
@@ -126,6 +131,8 @@ def loadfile(name):
     data = np.loadtxt(name,skiprows=300)
     im = np.int16(data[:-600,:])     # convert to signed 16 bit integer to allow overflow
     return im
+    #return np.copy(im[100:350,800:1200])
+    #return np.copy(im[0:550,400:1600])
 
 def sigmoid(x):
     return 1/(1 + np.exp(-x))
@@ -164,11 +171,23 @@ def getnonpearls(outpng,fname):
     np.savetxt(fname,np.asarray(refPt),fmt='%i')
     return refPt
 
-bandwidth = 0.4
+def maxpool(inmat,kern=2):
+        out=np.zeros((inmat.shape[0]//kern,inmat.shape[1]//kern,inmat.shape[2]))
+        (sz0,sz1,sz2) = out.shape
+        for r in range(sz0):
+            for c in range(sz1):
+                for l in range(sz2):
+                    out[r,c,l] = np.max(inmat[kern*r:kern*(r+1),kern*c:kern*(c+1),l])
+        return out
+
+
+
+bandwidth = 0.2
 nangles = 16
+captureTruths = False
 
 def main():
-    global refPt,i,ddir,bandwidth,nangles
+    global refPt,i,ddir,bandwidth,nangles,captureTruths
     angles = np.linspace(-np.pi,np.pi,nangles,endpoint=False)
 
     filename = "%s/frames_1.mat"%(ddir)
@@ -183,12 +202,32 @@ def main():
         GRAD[:,:,t] = np.fft.fft2(grad[:,:,t])
 
     #tempout = uint8norm(grad[:,:,0]).astype(np.uint8)
-    COS2 = cos2(img,0,bandwidth)
-    SIN2 = -1*sin2(img,0,bandwidth)
-
+    COS2 = cos2(img,0,bwd=bandwidth)
+    (sz0,sz1) = COS2.shape
+    SIN2 = sin2(img,0,bwd=bandwidth)
+    out = np.zeros((sz0,sz1,3),dtype=np.uint8)
+    out[:,:,0] = (uint8norm(np.roll(np.roll(np.abs(COS2),sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
+    out[:,:,2] = (uint8norm(np.roll(np.roll(np.abs(SIN2),sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8) 
+    cv.imwrite('%s/newoutput/COS2SIN2.png'%(ddir),out)
+    '''
+    cv.imwrite('%s/newoutput/COS2out.png'%(ddir), (uint8norm(np.roll(np.roll(np.abs(COS2),COS2.shape[0]//2,axis=0),COS2.shape[1],axis=1))).astype(np.uint8)) 
+    cv.imwrite('%s/newoutput/SIN2out.png'%(ddir), (uint8norm(np.roll(np.roll(np.abs(SIN2),SIN2.shape[0]//2,axis=0),SIN2.shape[1]//2,axis=1))).astype(np.uint8)) 
+    '''
+    cos2out = np.fft.ifft2(COS2)
+    sin2out = np.fft.ifft2(SIN2)
+    out[:,:,0] = (uint8norm(np.roll(np.roll(cos2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
+    out[:,:,2] = (uint8norm(np.roll(np.roll(sin2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8) 
+    frac = int(16)
+    cv.imwrite('%s/newoutput/cos2sin2.png'%(ddir),out[(frac//2-1)*sz0//frac:(frac//2+1)*sz0//frac,(frac//2-1)*sz1//frac:(frac//2+1)*sz1//frac,:])
+    '''
+    cv.imwrite('%s/newoutput/cos2out.png'%(ddir), (uint8norm(np.roll(np.roll(cos2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)) 
+    cv.imwrite('%s/newoutput/sin2out.png'%(ddir), (uint8norm(np.roll(np.roll(sin2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)) 
+    '''
     
 
-    for i in range(0,92,1):
+    startimage = 20
+    stopimage = 92
+    for i in range(startimage,stopimage,1):
         filename = "%s/frames_%i.mat"%(ddir,i)
         outname = "%s/out0_%i.dat"%(ddir,i)
         img = loadfile(filename)
@@ -202,9 +241,9 @@ def main():
         IMG = np.fft.fft2(img.astype(float))
         OUT1 = IMG * COS2
         OUT2 = IMG * SIN2
-        out1 = uint8norm(np.fft.ifft2( OUT1 ).real)
+        out1 = uint8norm(np.fft.ifft2( OUT1 ).real,border=4)
         out2 = np.fft.ifft2( OUT2 ).real
-        out2 = uint8norm(out2)
+        out2 = uint8norm(out2,border=4)
 
 
         outpng = np.zeros((img.shape[0], img.shape[1], 9),dtype=int)
@@ -221,26 +260,32 @@ def main():
         for t in range(angles.shape[0]):
             outmat[:,:,t] = np.fft.ifft2(GRAD[:,:,t]*IMG).real
         directionmat = np.argmax(outmat,axis=2).astype(float)
-        scalarmat = uint8norm(np.max(outmat,axis=2))
+        scalarmat = np.max(outmat,axis=2)
 
         del outmat
 
         outpng[:,:,0] = out2.astype(np.uint8)
-        outpng[:,:,1] = uint8norm(scalarmat).astype(np.uint8)
+        outpng[:,:,1] = uint8norm(scalarmat,border=4).astype(np.uint8)
         outpng[:,:,2] = out1.astype(np.uint8)
-        outpng[:,:,4] = uint8normSign(stdmat,1).astype(np.uint8)
+        outpng[:,:,4] = uint8normSign(stdmat,1,border=4).astype(np.uint8)
         outpng[:,:,3] = (np.cos(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
         outpng[:,:,5] = (np.sin(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
-        cv.imwrite('%s/newoutput/out1_img%03i.png'%(ddir,i), outpng[:,:,:3]) 
+        #out=maxpool(outpng[:,:,:3],kern=2)
+        out=outpng[100:350,800:1200,:3]
+        cv.imwrite('%s/newoutput/out1_img%03i.png'%(ddir,i), out) 
 
         refPt = []
-        fname = '%s/newoutput/frame_%03i.pearls'%(ddir,i)
-        cv.namedWindow("Pearls")
-        pearlcoords = getpearls(outpng,fname)
-        refPt = []
-        fname = '%s/newoutput/frame_%03i.nonpearls'%(ddir,i)
-        cv.namedWindow("Non-pearls")
-        nonpearlcoords = getnonpearls(outpng,fname)
+        if captureTruths:
+            fname = '%s/newoutput/frame_%03i.pearls'%(ddir,i)
+            cv.namedWindow("Pearls")
+            pearlcoords = getpearls(outpng,fname)
+            refPt = []
+            fname = '%s/newoutput/frame_%03i.nonpearls'%(ddir,i)
+            cv.namedWindow("Non-pearls")
+            nonpearlcoords = getnonpearls(outpng,fname)
+
+        out=outpng[100:350,800:1200,3:6]
+        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), out) 
 
         '''
             Encoding for the labels (ground truth) into an out3 png 8 bit file.
@@ -251,37 +296,41 @@ def main():
         truth += 127
 
         radii_lim = 20.
-        for (x,y) in pearlcoords:
-            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
-            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
-            directions[inds] = (np.angle((XXindmap[inds]-x) + 1j*(YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
-            truth[inds] = 255
+        if captureTruths:
+            for (x,y) in pearlcoords:
+                inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
+                radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
+                directions[inds] = (np.angle((XXindmap[inds]-x) + 1j*(YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
+                truth[inds] = 255
 
-        for (x,y) in nonpearlcoords:
-            inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
-            radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
-            directions[inds] = (np.angle((XXindmap[inds]-x) + 1j * (YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
-            truth[inds] = 0 
+            for (x,y) in nonpearlcoords:
+                inds = np.where(np.power(XXindmap-x,int(2))+np.power(YYindmap-y,int(2)) < radii_lim**2)
+                radii[inds] = (np.sqrt(np.power(XXindmap[inds]-x,int(2))+np.power(YYindmap[inds]-y,int(2)))/radii_lim * 256).astype(int)
+                directions[inds] = (np.angle((XXindmap[inds]-x) + 1j * (YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
+                truth[inds] = 0 
 
-        cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), outpng[:,:,3:6])
-        cv.imwrite('%s/newoutput/out3_img%03i.png'%(ddir,i), outpng[:,:,6:9])
+        out=outpng[100:350,800:1200,6:9]
+        cv.imwrite('%s/newoutput/out3_img%03i.png'%(ddir,i), out) 
 
-        cv.namedWindow("Truth")
-        tempout = np.zeros((outpng.shape[0],outpng.shape[1],4),dtype=np.uint8)
-        tempout[:,:,0] = outpng[:,:,0]
-        tempout[:,:,1] = outpng[:,:,1]
-        tempout[:,:,2] = outpng[:,:,2]
-        tempout[:,:,3] = truth
-        cv.imshow("Truth",tempout.astype(np.uint8))
-        cv.waitKey(0)
-        cv.destroyAllWindows()
+        if captureTruths:
+            cv.namedWindow("Truth")
+            tempout = np.zeros((outpng.shape[0],outpng.shape[1],4),dtype=np.uint8)
+            tempout[:,:,0] = outpng[:,:,0]
+            tempout[:,:,1] = outpng[:,:,1]
+            tempout[:,:,2] = outpng[:,:,2]
+            tempout[:,:,3] = truth
+            cv.imshow("Truth",tempout.astype(np.uint8))
+            cv.waitKey(0)
+            cv.destroyAllWindows()
 
-        outpng = outpng.reshape((outpng.shape[0]*outpng.shape[1],outpng.shape[2]))
-        pearlrows = [row for row in outpng.tolist() if row[6] > 200]
-        nonpearlrows = [row for row in outpng.tolist() if row[6] < 100]
-        np.savetxt('%s/newoutput/allpixels_img%03i.dat'%(ddir,i),outpng,fmt='%i')
-        np.savetxt('%s/newoutput/pearls_img%03i.dat'%(ddir,i),np.array(pearlrows),fmt='%i')
-        np.savetxt('%s/newoutput/nonpearls_img%03i.dat'%(ddir,i),np.array(nonpearlrows),fmt='%i')
+            outpng = outpng.reshape((outpng.shape[0]*outpng.shape[1],outpng.shape[2]))
+            pearlrows = [row for row in outpng.tolist() if row[6] > 200]
+            nonpearlrows = [row for row in outpng.tolist() if row[6] < 100]
+            np.savetxt('%s/newoutput/allpixels_img%03i.dat'%(ddir,i),outpng,fmt='%i')
+            np.savetxt('%s/newoutput/pearls_img%03i.dat'%(ddir,i),np.array(pearlrows),fmt='%i')
+            np.savetxt('%s/newoutput/nonpearls_img%03i.dat'%(ddir,i),np.array(nonpearlrows),fmt='%i')
+            print('finished printing pear features')
+
 
         print('finished image %i'%(i))
 
