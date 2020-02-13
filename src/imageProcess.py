@@ -208,7 +208,7 @@ def main():
     GRAD = np.zeros((img.shape[0],img.shape[1],angles.shape[0]),dtype=complex)
     for t in range(nangles):
         #grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.0125)
-        grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.01)
+        grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.0075)
         GRAD[:,:,t] = np.fft.fft2(grad[:,:,t])
 
     #tempout = uint8norm(grad[:,:,0]).astype(np.uint8)
@@ -227,7 +227,7 @@ def main():
     '''
     cos2out = np.fft.ifft2(COS2)
     sin2out = np.fft.ifft2(SIN2)
-    frac = int(64+32)
+    frac = int(128)
     out[:,:,0] = (uint8norm(np.roll(np.roll(cos2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
     out[:,:,1] = (uint8norm(np.roll(np.roll(grad[:,:,0],sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
     out[:,:,2] = (uint8norm(np.roll(np.roll(sin2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8) 
@@ -244,7 +244,7 @@ def main():
     
 
     startimage = 0
-    stopimage = 2
+    stopimage = 92 
     for i in range(startimage,stopimage,1):
         filename = "%s/frames_%i.mat"%(ddir,i)
         outname = "%s/out0_%i.dat"%(ddir,i)
@@ -259,10 +259,9 @@ def main():
         IMG = np.fft.fft2(img.astype(float))
         OUT1 = IMG * COS2
         OUT2 = IMG * SIN2
-        out1 = uint8norm(np.fft.ifft2( OUT1 ).real,border=4)
+        out1 = uint8norm(np.fft.ifft2( OUT1 ).real,border=50)
         out2 = np.fft.ifft2( OUT2 ).real
-        out2 = uint8norm(out2,border=4)
-
+        out2 = uint8normSign(out2,1,border=50)
 
         outpng = np.zeros((img.shape[0], img.shape[1], 9),dtype=int)
         ## stddev blur
@@ -282,14 +281,16 @@ def main():
 
         del outmat
 
-        outpng[:,:,0] = out2.astype(np.uint8)
-        outpng[:,:,1] = uint8norm(scalarmat,border=4).astype(np.uint8)
-        outpng[:,:,2] = out1.astype(np.uint8)
-        outpng[:,:,4] = uint8normSign(stdmat,1,border=4).astype(np.uint8)
+        outpng[:,:,2] = out2.astype(np.uint8)
+        outpng[:,:,1] = uint8norm(scalarmat,border=50).astype(np.uint8)
+        outpng[:,:,0] = out1.astype(np.uint8)
+        outpng[:,:,4] = uint8normSign(stdmat,1,border=50).astype(np.uint8)
         outpng[:,:,3] = (np.cos(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
         outpng[:,:,5] = (np.sin(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
-        out=np.copy(outpng[100:350,800:1200,:3])
-        out=maxpool(out,kern=2)
+        #out=np.copy(outpng[100:350,800:1200,:3])
+        out=np.copy(outpng[:,:,:3])
+        out=maxpool(out,kern=4)
+        #out[:,:,1:]=0
         (sz0,sz1) = outcos2.shape
         out[:sz0,:sz1,0] = outcos2
         out[:sz0,:sz1,1] = np.zeros(outcos2.shape)
@@ -314,8 +315,9 @@ def main():
             cv.namedWindow("Non-pearls")
             nonpearlcoords = getnonpearls(outpng,fname)
 
-        out=outpng[100:350,800:1200,3:6]
-        out=meanpool(out,kern=2)
+        #out=np.copy(outpng[100:350,800:1200,3:6])
+        out=np.copy(outpng[:,:,3:6])
+        out=meanpool(out,kern=4)
         cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), out) 
 
         '''
@@ -340,7 +342,9 @@ def main():
                 directions[inds] = (np.angle((XXindmap[inds]-x) + 1j * (YYindmap[inds]-y))/2./np.pi * 128 + 127).astype(int)
                 truth[inds] = 0 
 
-        out=outpng[100:350,800:1200,6:9]
+        #out=outpng[100:350,800:1200,6:9]
+        out=outpng[:,:,6:9]
+        out=meanpool(out,kern=4)
         cv.imwrite('%s/newoutput/out3_img%03i.png'%(ddir,i), out) 
 
         if captureTruths:

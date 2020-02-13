@@ -147,7 +147,7 @@ Identifying dislocations and relevant statistics through image processing is ess
 }
 \end{center}
 	We show ``featurization'' results as the three 8-bit color channels in two images.  
-	The left color image represents the three features that correspond to an optimal (blue channel), $\nabla^2$ Laplace, and $|\vec{\nabla}|$ filtering with the filter kernels shown at top in their respective color channels.
+	The left color image represents the three features that correspond to an optimal, $\nabla^2$ Laplace, and $|\vec{\nabla}|$ filtering with the filter kernels shown at top in their respective color channels.
 	The right color image shows the cosine and sine of $\vec{\nabla}/|\nabla|$ as red and blue respectively and the standard deviation filter as the green color channel.
 	These features are expected to characterize the local topology of the monochrome original image that would be more suitable for multi-channel matrix input for a convolutional neural network.
 	We note that the featurization itself can be represented as fixed convolutional layer with 6 filter channels that would be appropriately flashed to the FPGA chip on the detector.
