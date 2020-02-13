@@ -51,7 +51,7 @@ def derivV(M,center=0.,bwd=.1):
     return ZZ
 
 def derivTH(M,th=0.,center=0.,bwd=.1):
-    x=np.linspace(-1,1,M.shape[1])
+    x=np.linspace(-1*M.shape[1]/M.shape[0],1*M.shape[1]/M.shape[0],M.shape[1])
     y=np.linspace(-1,1,M.shape[0])
     XX,YY = np.meshgrid(x,y)
     XXP = XX * np.cos(th) - YY * np.sin(th)
@@ -171,6 +171,15 @@ def getnonpearls(outpng,fname):
     np.savetxt(fname,np.asarray(refPt),fmt='%i')
     return refPt
 
+def meanpool(inmat,kern=2):
+        out=np.zeros((inmat.shape[0]//kern,inmat.shape[1]//kern,inmat.shape[2]))
+        (sz0,sz1,sz2) = out.shape
+        for r in range(sz0):
+            for c in range(sz1):
+                for l in range(sz2):
+                    out[r,c,l] = np.mean(inmat[kern*r:kern*(r+1),kern*c:kern*(c+1),l])
+        return out
+
 def maxpool(inmat,kern=2):
         out=np.zeros((inmat.shape[0]//kern,inmat.shape[1]//kern,inmat.shape[2]))
         (sz0,sz1,sz2) = out.shape
@@ -182,7 +191,7 @@ def maxpool(inmat,kern=2):
 
 
 
-bandwidth = 0.2
+bandwidth = 0.125
 nangles = 16
 captureTruths = False
 
@@ -198,7 +207,8 @@ def main():
     grad = np.zeros((img.shape[0],img.shape[1],angles.shape[0]),dtype=float)
     GRAD = np.zeros((img.shape[0],img.shape[1],angles.shape[0]),dtype=complex)
     for t in range(nangles):
-        grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.0125)
+        #grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.0125)
+        grad[:,:,t] = derivTH(img,angles[t],center=0,bwd=.01)
         GRAD[:,:,t] = np.fft.fft2(grad[:,:,t])
 
     #tempout = uint8norm(grad[:,:,0]).astype(np.uint8)
@@ -207,26 +217,34 @@ def main():
     SIN2 = sin2(img,0,bwd=bandwidth)
     out = np.zeros((sz0,sz1,3),dtype=np.uint8)
     out[:,:,0] = (uint8norm(np.roll(np.roll(np.abs(COS2),sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
+    out[:,:,1] = (uint8norm(np.roll(np.roll(np.abs(GRAD[:,:,0]),sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
     out[:,:,2] = (uint8norm(np.roll(np.roll(np.abs(SIN2),sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8) 
-    cv.imwrite('%s/newoutput/COS2SIN2.png'%(ddir),out)
+    cv.imwrite('%s/newoutput/COS2.png'%(ddir),out[:,:,0])
+    cv.imwrite('%s/newoutput/SIN2.png'%(ddir),out[:,:,2])
     '''
     cv.imwrite('%s/newoutput/COS2out.png'%(ddir), (uint8norm(np.roll(np.roll(np.abs(COS2),COS2.shape[0]//2,axis=0),COS2.shape[1],axis=1))).astype(np.uint8)) 
     cv.imwrite('%s/newoutput/SIN2out.png'%(ddir), (uint8norm(np.roll(np.roll(np.abs(SIN2),SIN2.shape[0]//2,axis=0),SIN2.shape[1]//2,axis=1))).astype(np.uint8)) 
     '''
     cos2out = np.fft.ifft2(COS2)
     sin2out = np.fft.ifft2(SIN2)
+    frac = int(64+32)
     out[:,:,0] = (uint8norm(np.roll(np.roll(cos2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
+    out[:,:,1] = (uint8norm(np.roll(np.roll(grad[:,:,0],sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)
     out[:,:,2] = (uint8norm(np.roll(np.roll(sin2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8) 
-    frac = int(16)
-    cv.imwrite('%s/newoutput/cos2sin2.png'%(ddir),out[(frac//2-1)*sz0//frac:(frac//2+1)*sz0//frac,(frac//2-1)*sz1//frac:(frac//2+1)*sz1//frac,:])
+    outcos2 = np.copy(out[(frac//2-1)*sz0//frac:(frac//2+1)*sz0//frac,(frac//2-1)*sz1//frac:(frac//2+1)*sz1//frac,0])
+    outgrad = np.copy(out[(frac//2-1)*sz0//frac:(frac//2+1)*sz0//frac,(frac//2-1)*sz1//frac:(frac//2+1)*sz1//frac,1])
+    outsin2 = np.copy(out[(frac//2-1)*sz0//frac:(frac//2+1)*sz0//frac,(frac//2-1)*sz1//frac:(frac//2+1)*sz1//frac,2])
+    cv.imwrite('%s/newoutput/cos2.png'%(ddir),outcos2)
+    cv.imwrite('%s/newoutput/sin2.png'%(ddir),outsin2)
+    cv.imwrite('%s/newoutput/grad.png'%(ddir),outgrad)
     '''
     cv.imwrite('%s/newoutput/cos2out.png'%(ddir), (uint8norm(np.roll(np.roll(cos2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)) 
     cv.imwrite('%s/newoutput/sin2out.png'%(ddir), (uint8norm(np.roll(np.roll(sin2out.real,sz0//2,axis=0),sz1//2,axis=1))).astype(np.uint8)) 
     '''
     
 
-    startimage = 20
-    stopimage = 92
+    startimage = 0
+    stopimage = 2
     for i in range(startimage,stopimage,1):
         filename = "%s/frames_%i.mat"%(ddir,i)
         outname = "%s/out0_%i.dat"%(ddir,i)
@@ -270,8 +288,20 @@ def main():
         outpng[:,:,4] = uint8normSign(stdmat,1,border=4).astype(np.uint8)
         outpng[:,:,3] = (np.cos(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
         outpng[:,:,5] = (np.sin(directionmat * 2*np.pi/nangles)*127 + 128).astype(np.uint8)
-        #out=maxpool(outpng[:,:,:3],kern=2)
-        out=outpng[100:350,800:1200,:3]
+        out=np.copy(outpng[100:350,800:1200,:3])
+        out=maxpool(out,kern=2)
+        (sz0,sz1) = outcos2.shape
+        out[:sz0,:sz1,0] = outcos2
+        out[:sz0,:sz1,1] = np.zeros(outcos2.shape)
+        out[:sz0,:sz1,2] = np.zeros(outcos2.shape)
+        (sz00,sz11) = outsin2.shape
+        out[:sz00,sz1:sz1+sz11,2] = outsin2
+        out[:sz00,sz1:sz1+sz11,1] = np.zeros(outsin2.shape)
+        out[:sz00,sz1:sz1+sz11,0] = np.zeros(outsin2.shape)
+        (sz000,sz111) = outgrad.shape
+        out[:sz000,sz1+sz11:sz1+sz11+sz111,1] = outgrad
+        out[:sz000,sz1+sz11:sz1+sz11+sz111,0] = np.zeros(outgrad.shape)
+        out[:sz000,sz1+sz11:sz1+sz11+sz111,2] = np.zeros(outgrad.shape)
         cv.imwrite('%s/newoutput/out1_img%03i.png'%(ddir,i), out) 
 
         refPt = []
@@ -285,6 +315,7 @@ def main():
             nonpearlcoords = getnonpearls(outpng,fname)
 
         out=outpng[100:350,800:1200,3:6]
+        out=meanpool(out,kern=2)
         cv.imwrite('%s/newoutput/out2_img%03i.png'%(ddir,i), out) 
 
         '''
@@ -338,6 +369,6 @@ def main():
 
 if __name__ == "__main__":
     ddir = "./DataSet2"
-    bandwidth =0.4
+    bandwidth =0.3
     nangles = 16
     main()
